@@ -8,6 +8,20 @@ class TestApp(unittest.TestCase):
         self.app.testing = True
         with app.app_context():
             db.create_all()
+            # Регистрация пользователя перед тестами
+            self.app.post('/register', json={
+                "username": "testuser",
+                "password": "testpassword",
+                "subscription_level": "basic",
+                "account_status": "active"
+            })
+            # Добавление ресурса перед тестами
+            access_token = self.get_access_token()
+            self.app.post('/resources', json={
+                "name": "Resource 1",
+                "access_level": "basic",
+                "available_hours": "09:00-18:00"
+            }, headers={"Authorization": f"Bearer {access_token}"})
 
     def tearDown(self):
         with app.app_context():
@@ -16,8 +30,8 @@ class TestApp(unittest.TestCase):
 
     def test_register(self):
         response = self.app.post('/register', json={
-            "username": "testuser",
-            "password": "testpassword",
+            "username": "testuser2",
+            "password": "testpassword2",
             "subscription_level": "basic",
             "account_status": "active"
         })
@@ -35,7 +49,7 @@ class TestApp(unittest.TestCase):
     def test_add_resource(self):
         access_token = self.get_access_token()
         response = self.app.post('/resources', json={
-            "name": "Resource 1",
+            "name": "Resource 2",
             "access_level": "basic",
             "available_hours": "09:00-18:00"
         }, headers={"Authorization": f"Bearer {access_token}"})
@@ -48,7 +62,7 @@ class TestApp(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         resources = response.get_json()["resources"]
         self.assertEqual(len(resources), 1)
-        self.assertEqual(resources[0]["name"], "Resource 1")
+        self.assertEqual(resources[]["name"], "Resource 1")
 
     def get_access_token(self):
         response = self.app.post('/login', json={

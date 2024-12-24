@@ -5,6 +5,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
 
 load_dotenv()
 
@@ -68,60 +69,63 @@ def login():
 @jwt_required()
 def add_resource():
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
-    if user.account_status != 'active':
-        return jsonify({"message": "Account is not active"}), 403
-    data = request.get_json()
-    new_resource = Resource(
-        name=data['name'],
-        access_level=data['access_level'],
-        available_hours=data['available_hours']
-    )
-    db.session.add(new_resource)
-    db.session.commit()
-    print(f"Resource added: {new_resource}")  # Отладочное сообщение
-    return jsonify({"message": "Resource added successfully"}), 201
+    with Session(db.engine) as session:
+        user = session.get(User, current_user_id)
+        if user.account_status != 'active':
+            return jsonify({"message": "Account is not active"}), 403
+        data = request.get_json()
+        new_resource = Resource(
+            name=data['name'],
+            access_level=data['access_level'],
+            available_hours=data['available_hours']
+        )
+        session.add(new_resource)
+        session.commit()
+        print(f"Resource added: {new_resource}")  # Отладочное сообщение
+        return jsonify({"message": "Resource added successfully"}), 201
 
 @app.route('/resources', methods=['GET'])
 @jwt_required()
 def get_resources():
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
-    if user.account_status != 'active':
-        return jsonify({"message": "Account is not active"}), 403
+    with Session(db.engine) as session:
+        user = session.get(User, current_user_id)
+        if user.account_status != 'active':
+            return jsonify({"message": "Account is not active"}), 403
 
-    current_time = datetime.now().strftime("%H:%M")
-    resources = Resource.query.all()
-    accessible_resources = []
+        current_time = datetime.now().strftime("%H:%M")
+        resources = session.query(Resource).all()
+        accessible_resources = []
 
-    for resource in resources:
-        start_time, end_time = resource.available_hours.split('-')
-        if user.subscription_level == 'premium' or (user.subscription_level == 'basic' and resource.access_level == 'basic'):
-            if start_time <= current_time <= end_time:
-                accessible_resources.append({"name": resource.name, "access_level": resource.access_level})
+        for resource in resources:
+            start_time, end_time = resource.available_hours.split('-')
+            if user.subscription_level == 'premium' or (user.subscription_level == 'basic' and resource.access_level == 'basic'):
+                if start_time <= current_time <= end_time:
+                    accessible_resources.append({"name": resource.name, "access_level": resource.access_level})
 
-    print(f"Accessible resources: {accessible_resources}")  # Отладочное сообщение
-    return jsonify({"resources": accessible_resources}), 200
+        print(f"Accessible resources: {accessible_resources}")  # Отладочное сообщение
+        return jsonify({"resources": accessible_resources}), 200
 
 @app.route('/resources/<int:resource_id>', methods=['GET'])
 @jwt_required()
 def get_resource(resource_id):
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
-    if user.account_status != 'active':
-        return jsonify({"message": "Account is not active"}), 403
+    with Session(db.engine) as session:
+        user = session.get(User, current_user_id)
+        if user.account_status != 'active':
+            return jsonify({"message": "Account is not active"}), 403
 
-    current_time = datetime.now().strftime("%H:%M")
-    resource = Resource.query.get(resource_id)
-    if not resource:
-        return jsonify({"message": "Resource not found"}), 404
+        current_time = datetime.now().strftime("%H:%M")
+        resource = session.get(Resource, resource_id)
+        if not resource:
+            return jsonify({"message": "Resource not found"}), 404
 
-    start_time, end_time = resource.available_hours.split('-')
-    if user.subscription_level == 'premium' or (user.subscription_level == 'basic' and resource.access_level == 'basic'):
-        if start_time <= current_time <= end_time:
-            return jsonify({"name": resource.name, "access_level": resource.access_level}), 200
+        start_time, end_time = resource.available_hours.split('-')
+        if user.subscription_level == 'premium' or (user.subscription_level == 'basic' and resource.access_level == 'basic'):
+            if start_time <= current_time <= end_time:
+                return jsonify({"name": resource.name, "access_level": resource.access_level}), 200
 
-    return jsonify({"message": "Access denied"}), 403
+        return jsonify({"message": "Access denied"}), 403
 
 if __name__ == '__main__':
     with app.app_context():
