@@ -1,5 +1,5 @@
 import pytest
-from app import app, db, User, Resource
+from app import app, db, User
 
 @pytest.fixture
 def client():
@@ -20,7 +20,7 @@ def test_register_user(client):
         "subscription_level": "basic",
         "account_status": "active"
     })
-    assert response.status_code == 201
+    assert response.status_code == 201, f"Expected status code 201, got {response.status_code}"
     assert response.get_json()["message"] == "User registered successfully"
 
 def test_login_user(client):
@@ -34,5 +34,5 @@ def test_login_user(client):
         "username": "test_user",
         "password": "password123"
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
     assert "access_token" in response.get_json()
