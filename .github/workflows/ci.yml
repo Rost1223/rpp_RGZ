@@ -24,7 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flask flask-sqlalchemy flask-bcrypt flask-jwt-extended pytest bandit
+        pip install flask flask-sqlalchemy flask-bcrypt flask-jwt-extended pytest python-dotenv bandit
 
     - name: Run tests
       run: |
