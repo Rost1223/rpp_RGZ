@@ -8,7 +8,7 @@ import os
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'my_secret_key'
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'default_secret_key')
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -28,11 +28,20 @@ class Resource(db.Model):
     access_level = db.Column(db.String(20), nullable=False)
     available_hours = db.Column(db.String(20), nullable=False)
 
-
 # Routes
+@app.route('/')
+def home():
+    return jsonify({"message": "Welcome to the API!"}), 200
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({"message": "Missing username or password"}), 400
+    
+    if User.query.filter_by(username=data['username']).first():
+        return jsonify({"message": "User already exists"}), 400
+
     hashed_password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
     new_user = User(
         username=data['username'],
@@ -47,19 +56,28 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({"message": "Missing username or password"}), 400
+
     user = User.query.filter_by(username=data['username']).first()
     if user and bcrypt.check_password_hash(user.password, data['password']):
         access_token = create_access_token(identity=user.id)
         return jsonify({"access_token": access_token}), 200
     return jsonify({"message": "Invalid credentials"}), 401
 
+def check_account_status(user):
+    if user.account_status != 'active':
+        return jsonify({"message": "Account is not active"}), 403
+
 @app.route('/resources', methods=['POST'])
 @jwt_required()
 def add_resource():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    if user.account_status != 'active':
-        return jsonify({"message": "Account is not active"}), 403
+    response = check_account_status(user)
+    if response:
+        return response
+
     data = request.get_json()
     new_resource = Resource(
         name=data['name'],
@@ -75,8 +93,9 @@ def add_resource():
 def get_resources():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    if user.account_status != 'active':
-        return jsonify({"message": "Account is not active"}), 403
+    response = check_account_status(user)
+    if response:
+        return response
 
     current_time = datetime.now().strftime("%H:%M")
     resources = Resource.query.all()
@@ -95,8 +114,9 @@ def get_resources():
 def get_resource(resource_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    if user.account_status != 'active':
-        return jsonify({"message": "Account is not active"}), 403
+    response = check_account_status(user)
+    if response:
+        return response
 
     current_time = datetime.now().strftime("%H:%M")
     resource = Resource.query.get(resource_id)
@@ -111,5 +131,6 @@ def get_resource(resource_id):
     return jsonify({"message": "Access denied"}), 403
 
 if __name__ == '__main__':
-    db.create_all()
-    app.run(debug=True)
+    with app.app_context():
+        db.create_all()
+    app.run(debug=False)
