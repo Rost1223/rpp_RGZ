@@ -28,6 +28,7 @@ class Resource(db.Model):
     access_level = db.Column(db.String(20), nullable=False)
     available_hours = db.Column(db.String(20), nullable=False)
 
+
 # Routes
 @app.route('/register', methods=['POST'])
 def register():
