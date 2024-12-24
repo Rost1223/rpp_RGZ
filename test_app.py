@@ -62,7 +62,7 @@ class TestApp(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         resources = response.get_json()["resources"]
         self.assertEqual(len(resources), 1)
-        self.assertEqual(resources[]["name"], "Resource 1")
+        self.assertEqual(resources[0]["name"], "Resource 1")
 
     def get_access_token(self):
         response = self.app.post('/login', json={
